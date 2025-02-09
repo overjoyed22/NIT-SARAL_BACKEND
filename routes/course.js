@@ -18,38 +18,49 @@ cloudinary.config({
 
 
 // ADDING NEW COURSE STARTS HERE
-router.post('/add-course',checkAuth,(req,res)=>{
-    const token = req.headers.authorization.split(" ")[1]
-    const verify =  jwt.verify(token,'nit-saral');
+router.post('/add-course', checkAuth, async (req, res) => {
+    try {
+        const token = req.headers.authorization.split(" ")[1];
+        const verify = jwt.verify(token, 'nit-saral');
 
-    cloudinary.uploader.upload(req.files.image.tempFilePath,(err,result)=>{
-        const newCourse= new Course({
-            _id: new mongoose.Types.ObjectId,
-            courseName: req.body.courseName,
-            price:req.body.price,
-            description:req.body.description,
-            startingDate: req.body.startingDate,
-            endDate:req.body.endDate,
-            uid:verify.uid,
-           imageUrl: result.secure_url,
-           imageId: result.public_id
-        })
-        newCourse.save()
-        .then(result=>{
-               res.status(200).json({
-                newCourse:result
-            })
-        })
-        .catch(err=>{
-            console.log(err)
-            res.status(500).json({
-                error:err
-            })
-        })
-    })
+        // Ensure file is uploaded
+        if (!req.files || !req.files.image) {
+            return res.status(400).json({ error: "Image file is required" });
+        }
 
- 
-})
+        // Upload to Cloudinary
+        cloudinary.uploader.upload(req.files.image.tempFilePath, async (err, result) => {
+            if (err) {
+                return res.status(500).json({ error: "Cloudinary upload failed" });
+            }
+
+            // Create new course
+            const newCourse = new Course({
+                _id: new mongoose.Types.ObjectId(),
+                courseName: req.body.courseName,
+                price: req.body.price,
+                description: req.body.description,
+                startingDate: req.body.startingDate,
+                endDate: req.body.endDate,
+                uid: verify.uid,
+                imageUrl: result.secure_url,
+                imageId: result.public_id
+            });
+
+            try {
+                const savedCourse = await newCourse.save();
+                res.status(200).json({ newCourse: savedCourse });
+            } catch (saveError) {
+                console.error(saveError);
+                res.status(500).json({ error: "Failed to save course" });
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Invalid token or server error" });
+    }
+});
+
 
 // GET ALL COURSES
 
@@ -246,33 +257,38 @@ router.get('/latest-courses',checkAuth,(req,res)=>{
 // WE ARE USING TRY AND CATCH ASYNC AWAIT HERE INSTEAD OF THEN AND CATCH AS IN THEN AND CATCH WE HAD TO BUT A THEN CATCH FOR EVERY SINGLE THING
 // BUT IN TRY CACTH WE CAN WRITE ALL THE STEPS IN TRY AND IF WE GET ERROR AT ANY STEP 
 // IT CAN BE DETECTED IN A SINGLE CATCH BLOCK
-router.get('/home',checkAuth,async(req,res)=>{
-    try{  
+router.get('/home/', checkAuth, async (req, res) => {
+    try {  
         const token = req.headers.authorization.split(" ")[1];
-        const verify = jwt.verify(token,'nit-saral');
-        const  newCourses= await Course.find({uid:verify.uid}).sort({$natural:-1}).limit(10)
-        const  newStudents = await Student.find({uid:verify.uid}).sort({$natural:-1}).limit(10)
-        const totalCourse = await Course.countDocuments({uid:verify.uid})
-        const totalStudent = await Course.countDocuments({uid:verify.uid})
-        const totalAmount = await fee.aggreagate([
-              {$match : {uid:verify.uid}},
-              {$group : {_id:null,total:{$sum:"$amount"}}}
-        ])
+        const verify = jwt.verify(token, 'nit-saral');
+
+        const newCourses = await Course.find({ uid: verify.uid }).sort({ $natural: -1 }).limit(10);
+        const newStudents = await Student.find({ uid: verify.uid }).sort({ $natural: -1 }).limit(10);
+        const totalCourse = await Course.countDocuments({ uid: verify.uid });
+        const totalStudent = await Student.countDocuments({ uid: verify.uid });
+
+        const totalAmountResult = await fee.aggregate([
+            { $match: { uid: verify.uid } },
+            { $group: { _id: null, total: { $sum: "$amount" } } }
+        ]);
+
+        const totalAmount = totalAmountResult.length > 0 ? totalAmountResult[0].total : 0;
 
         res.status(200).json({
-            courses:newCourses,
-            students:newStudents,
+            courses: newCourses,
+            students: newStudents,
             totalCourse: totalCourse,
-            totalStudent:totalStudent,
-            totalAmount:totalAmount.length>0 ? totalAmount[0].total : 0
-        })
+            totalStudent: totalStudent,
+            totalAmount: totalAmount
+        });
+    } catch (err) {
+        console.error("🔥 Backend Error:", err); // Logs the full error
+        res.status(500).json({
+            error: err.message // Send readable error to frontend
+        });
     }
-    catch(err){
-         res.status(500).json({
-            error:err
-         })
-    }
-})
+});
+
 
 
 module.exports = router; 

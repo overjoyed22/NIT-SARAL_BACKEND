@@ -20,6 +20,7 @@ mongoose.connect('mongodb+srv://overjoyed22:Pulkit2003@cluster0.kwzqx.mongodb.ne
 
 
 app.use(bodyParser.json())
+app.use(cors());
 
 // USING FILEUPLOAD 
 app.use(fileUpload({
@@ -36,7 +37,7 @@ app.use('/user', userRoute)
 app.use('/fee', feeRoute)
 app.use('/course', courseRoute)
 app.use('/student', studentRoute)
-app.use(cors());
+
 
 app.use('*', (req,res)=>{
     res.status(404).json({
