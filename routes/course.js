@@ -18,49 +18,49 @@ cloudinary.config({
 
 
 // ADDING NEW COURSE STARTS HERE
-router.post('/add-course', checkAuth, async (req, res) => {
+
+router.post("/add-course", checkAuth, async (req, res) => {
     try {
-        const token = req.headers.authorization.split(" ")[1];
-        const verify = jwt.verify(token, 'nit-saral');
-
-        // Ensure file is uploaded
-        if (!req.files || !req.files.image) {
-            return res.status(400).json({ error: "Image file is required" });
+      const token = req.headers.authorization.split(" ")[1];
+      const verify = jwt.verify(token, "nit-saral");
+      console.log("User ID:", verify.uid); // Debug
+  
+      if (!req.files || !req.files.image) {
+        return res.status(400).json({ error: "Image file is required" });
+      }
+  
+      cloudinary.uploader.upload(req.files.image.tempFilePath, async (err, result) => {
+        if (err) {
+          console.error("Cloudinary upload error:", err); // Debug
+          return res.status(500).json({ error: "Cloudinary upload failed" });
         }
-
-        // Upload to Cloudinary
-        cloudinary.uploader.upload(req.files.image.tempFilePath, async (err, result) => {
-            if (err) {
-                return res.status(500).json({ error: "Cloudinary upload failed" });
-            }
-
-            // Create new course
-            const newCourse = new Course({
-                _id: new mongoose.Types.ObjectId(),
-                courseName: req.body.courseName,
-                price: req.body.price,
-                description: req.body.description,
-                startingDate: req.body.startingDate,
-                endDate: req.body.endDate,
-                uid: verify.uid,
-                imageUrl: result.secure_url,
-                imageId: result.public_id
-            });
-
-            try {
-                const savedCourse = await newCourse.save();
-                res.status(200).json({ newCourse: savedCourse });
-            } catch (saveError) {
-                console.error(saveError);
-                res.status(500).json({ error: "Failed to save course" });
-            }
+  
+        const newCourse = new Course({
+          _id: new mongoose.Types.ObjectId(),
+          courseName: req.body.courseName,
+          price: req.body.price,
+          description: req.body.description,
+          startingDate: req.body.startingDate,
+          endDate: req.body.endDate,
+          uid: verify.uid,
+          imageUrl: result.secure_url,
+          imageId: result.public_id,
         });
+  
+        try {
+          const savedCourse = await newCourse.save();
+          res.status(200).json({ newCourse: savedCourse });
+        } catch (saveError) {
+          console.error("Database save error:", saveError); // Debug
+          res.status(500).json({ error: "Failed to save course" });
+        }
+      });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Invalid token or server error" });
+      console.error("Token validation or server error:", err); // Debug
+      res.status(500).json({ error: "Invalid token or server error" });
     }
-});
-
+  });
+  
 
 // GET ALL COURSES
 
